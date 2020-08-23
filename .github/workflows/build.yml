@@ -1,0 +1,128 @@
+name: "build"
+
+on:
+  push:
+    branches:
+      - "*"
+    tags:
+      - '*'
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  job_windows:
+    name: "Build for Windows"
+    runs-on: 'windows-latest'
+    steps:
+      - name: "Git Clone"
+        uses: "actions/checkout@v2"
+      - name: "Setup JDK"
+        uses: "actions/setup-java@v1"
+        with:
+          java-version: "11"
+          architecture: "x64"
+      - name: "Gradle Windows"
+        shell: cmd
+        run: |
+          gradlew.bat :m3u8java-gui:buildWindows
+      - name: "Upload Windows build"
+        uses: "actions/upload-artifact@v1"
+        with:
+          name: "windows"
+          path: "m3u8java-gui/build/distributions/m3u8java-gui.zip"
+
+
+  job_mac:
+    name: "Build for Mac"
+    runs-on: 'macos-latest'
+    steps:
+      - name: "Git Clone"
+        uses: "actions/checkout@v2"
+      - name: "Setup JDK"
+        uses: "actions/setup-java@v1"
+        with:
+          java-version: "11"
+          architecture: "x64"
+      - name: "Gradle Mac"
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :m3u8java-gui:buildMac
+      - name: "Upload Mac build"
+        uses: "actions/upload-artifact@v1"
+        with:
+          name: "mac"
+          path: "m3u8java-gui/build/distributions/m3u8java-gui.tar.gz"
+
+  job_linux:
+    name: "Build for Linux"
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: "Git Clone"
+        uses: "actions/checkout@v2"
+      - name: "Setup JDK"
+        uses: "actions/setup-java@v1"
+        with:
+          java-version: "11"
+          architecture: "x64"
+      - name: "Gradle Linux"
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :m3u8java-gui:buildLinux
+      - name: "Upload Linux build"
+        uses: "actions/upload-artifact@v1"
+        with:
+          name: "linux"
+          path: "m3u8java-gui/build/distributions/m3u8java-gui.tar.gz"
+
+  job_release:
+    name: "Release"
+    needs:
+      - job_windows
+      - job_mac
+      - job_linux
+    runs-on: 'ubuntu-latest'
+    if: "contains(github.ref, 'tags/')"
+    steps:
+      - name: "Download all build"
+        uses: "actions/download-artifact@v2"
+        with:
+          path: "build"
+      - name: "Create Release"
+        id: "create_release"
+        uses: "actions/create-release@v1"
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        with:
+          tag_name: "${{ github.ref }}"
+          release_name: "Release ${{ github.ref }}"
+          body: ""
+          draft: false
+          prerelease: false
+      - name: "Release Windows build"
+        uses: "actions/upload-release-asset@v1"
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        with:
+          upload_url: "${{ steps.create_release.outputs.upload_url }}"
+          asset_path: "build/windows/m3u8java-gui.zip"
+          asset_name: "windows.zip"
+          asset_content_type: "application/zip"
+      - name: "Release Mac build"
+        uses: "actions/upload-release-asset@v1"
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        with:
+          upload_url: "${{ steps.create_release.outputs.upload_url }}"
+          asset_path: "build/mac/m3u8java-gui.tar.gz"
+          asset_name: "mac.zip"
+          asset_content_type: "application/zip"
+      - name: "Release Linux build"
+        uses: "actions/upload-release-asset@v1"
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        with:
+          upload_url: "${{ steps.create_release.outputs.upload_url }}"
+          asset_path: "build/linux/m3u8java-gui.tar.gz"
+          asset_name: "linux.zip"
+          asset_content_type: "application/zip"

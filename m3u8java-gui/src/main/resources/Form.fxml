@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="826.0" prefWidth="917.0" xmlns="http://javafx.com/javafx/8.0.40" xmlns:fx="http://javafx.com/fxml/1" fx:controller="info.repy.m3u8java.gui.FormController">
+	<children>
+		<TabPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" tabClosingPolicy="UNAVAILABLE" tabMaxHeight="1.7976931348623157E308" tabMaxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS">
+			<tabs>
+				<Tab text="m3u8Downloder">
+					<content>
+						<GridPane hgap="14.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" vgap="14.0">
+							<padding>
+								<Insets bottom="14.0" left="14.0" right="14.0" top="14.0" />
+							</padding>
+							<columnConstraints>
+								<ColumnConstraints />
+								<ColumnConstraints halignment="RIGHT" hgrow="ALWAYS" />
+							</columnConstraints>
+							<rowConstraints>
+								<RowConstraints />
+								<RowConstraints />
+								<RowConstraints />
+							</rowConstraints>
+							<children>
+								<Label text="URL" GridPane.columnIndex="0" GridPane.halignment="LEFT" GridPane.hgrow="NEVER" GridPane.rowIndex="0" GridPane.valignment="CENTER" GridPane.vgrow="NEVER" />
+								<TextField fx:id="urlUrl" GridPane.columnIndex="1" GridPane.halignment="CENTER" GridPane.hgrow="ALWAYS" GridPane.rowIndex="0" GridPane.valignment="CENTER" GridPane.vgrow="NEVER" />
+								<Label text="ファイル名" GridPane.columnIndex="0" GridPane.halignment="LEFT" GridPane.hgrow="NEVER" GridPane.rowIndex="1" GridPane.valignment="CENTER" GridPane.vgrow="NEVER" />
+								<TextField fx:id="urlFilename" GridPane.columnIndex="1" GridPane.halignment="CENTER" GridPane.hgrow="ALWAYS" GridPane.rowIndex="1" GridPane.valignment="CENTER" GridPane.vgrow="NEVER" />
+								<Button mnemonicParsing="false" onAction="#urlDownloadAction" text="ダウンロード" GridPane.columnIndex="1" GridPane.halignment="RIGHT" GridPane.hgrow="NEVER" GridPane.rowIndex="2" GridPane.valignment="CENTER" GridPane.vgrow="NEVER" />
+							</children>
+						</GridPane>
+					</content>
+				</Tab>
+			</tabs>
+		</TabPane>
+		<HBox spacing="14.0" VBox.vgrow="NEVER">
+			<children>
+				<ProgressBar fx:id="progressBar" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" progress="0.0" HBox.hgrow="ALWAYS" />
+				<Label fx:id="progressLabel" maxHeight="1.7976931348623157E308" text="0/0" HBox.hgrow="NEVER" />
+			</children>
+			<VBox.margin>
+				<Insets bottom="14.0" left="14.0" right="14.0" />
+			</VBox.margin>
+		</HBox>
+	</children>
+</VBox>

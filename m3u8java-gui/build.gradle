@@ -1,0 +1,83 @@
+plugins {
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.0.8'
+    // zipの"image/lib/modules"内にJDKとOpenJFXとアプリが合体して保存される
+    id 'org.beryx.jlink' version '2.18.0'
+    // JDKのみにしたい場合は"org.beryx.runtime"を使う
+}
+
+group 'info.repy'
+version '1.0-SNAPSHOT'
+
+java{
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+application {
+    mainModule = 'info.repy.m3u8java.gui'
+    mainClass = 'info.repy.m3u8java.gui.GUI'
+}
+
+compileJava {
+    options.encoding = "UTF-8"
+}
+
+javafx {
+    modules = ['javafx.controls', 'javafx.fxml']
+}
+
+jlink {
+    // zipの"image/lib/modules"内にJDKとOpenJFXとアプリが合体して保存される
+    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages', '--add-modules', 'java.base,jdk.crypto.cryptoki,jdk.crypto.ec']
+    launcher {
+        name = 'm3u8java'
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation  project(':m3u8java-core')
+   // implementation 'org.json:json:20180813'
+   // implementation 'org.apache.commons:commons-compress:1.20'
+    compileOnly 'org.projectlombok:lombok:1.18.12'
+    annotationProcessor 'org.projectlombok:lombok:1.18.12'
+    testCompileOnly 'org.projectlombok:lombok:1.18.12'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.12'
+}
+
+task buildWindows(type: Zip, dependsOn: jlinkZip) {
+    archiveName = "m3u8java-gui.zip"
+    from zipTree(tasks.jlinkZip.imageZip)
+    from "scripts/windows/m3u8java-gui.bat"
+}
+
+task buildMacDir(dependsOn: jlinkZip) {
+    doLast {
+        delete fileTree('build/macapp')
+        copy {
+            from fileTree("scripts/mac")
+            into 'build/macapp/m3u8java.app'
+        }
+        copy {
+            from zipTree(tasks.jlinkZip.imageZip)
+            into 'build/macapp/m3u8java.app/Contents/MacOS'
+        }
+    }
+}
+
+task buildMac(type: Tar, dependsOn: buildMacDir) {
+    compression = Compression.GZIP
+    archiveName = "m3u8java-gui.tar.gz"
+    from 'build/macapp'
+}
+
+task buildLinux(type: Tar, dependsOn: jlinkZip) {
+    compression = Compression.GZIP
+    archiveName = "m3u8java-gui.tar.gz"
+    from zipTree(tasks.jlinkZip.imageZip)
+    from "scripts/linux/m3u8java-gui.sh"
+}
