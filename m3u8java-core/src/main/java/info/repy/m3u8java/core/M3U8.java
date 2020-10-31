@@ -1,6 +1,7 @@
 package info.repy.m3u8java.core;
 
 import java.net.*;
+import java.nio.ByteBuffer;
 import java.security.*;
 import java.io.*;
 import java.util.ArrayList;
@@ -11,21 +12,27 @@ import javax.crypto.*;
 import javax.crypto.spec.*;
 
 public class M3U8 extends AbstractExecuter {
+	private static final int MULTI_DOWNLOAD = 3; // tsを同時3ダウンロード
 
 	private static enum KeyType {
 		NONE,
 		AES128
 	}
 
-	private static class Download {
+	private static class TSDownload {
+		private static final int TS_PACKET_SIZE = 188; // mpegtsが188でワンパケットのため188
 
 		private final double time;
 		private final URL url;
 		private final KeyType type;
 		private final byte[] key;
 		private final byte[] iv;
+		private byte[] bytes;
+		private Exception ex = null;
+		private boolean finish = false;
 
-		public Download(double time, URL url, KeyType type, byte[] key, byte[] iv) {
+
+		public TSDownload(double time, URL url, KeyType type, byte[] key, byte[] iv) {
 			this.time = time;
 			this.url = url;
 			this.type = type;
@@ -51,6 +58,57 @@ public class M3U8 extends AbstractExecuter {
 
 		public byte[] getIv() {
 			return iv;
+		}
+
+		public boolean isFinish() {
+			return finish;
+		}
+
+		public void start() {
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try{
+						if (finish) return;
+						Cipher cipher;
+						KeyType type = TSDownload.this.getType();
+						if (type == KeyType.AES128) {
+							cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+							Key skey = new SecretKeySpec(TSDownload.this.getKey(), "AES");
+							IvParameterSpec param = new IvParameterSpec(TSDownload.this.getIv());
+							cipher.init(Cipher.DECRYPT_MODE, skey, param);
+						} else if (type == KeyType.NONE) {
+							cipher = new NullCipher();
+						} else {
+							throw new IllegalStateException();
+						}
+
+						try (CipherInputStream cipherInputStream = new CipherInputStream(new BufferedInputStream(TSDownload.this.getUrl().openStream()), cipher)) {
+							byte[] bytes = cipherInputStream.readAllBytes();
+							if(bytes.length % TS_PACKET_SIZE != 0) {
+								throw new IllegalStateException("MPEG2 TSでないファイル");
+							}
+							for (int i = 0; i < bytes.length; i=i+TS_PACKET_SIZE) {
+								if(bytes[i] != 0x47){
+									throw new IllegalStateException("MPEG2 TSでないファイル");
+								}
+							}
+							TSDownload.this.bytes = bytes;
+						}
+					} catch (Exception e) {
+						TSDownload.this.ex = e;
+					} finally {
+						TSDownload.this.finish=true;
+					}
+				}
+			}).start();
+		}
+		public byte[] getData() throws Exception {
+			if(this.ex != null) throw this.ex;
+			if(!this.finish) return null;
+			byte[] ret = this.bytes;
+			this.bytes = null;
+			return ret;
 		}
 	}
 
@@ -105,109 +163,67 @@ public class M3U8 extends AbstractExecuter {
 				}
 			}
 			if (mediaURL == null) mediaURL = m3u8Url;
-			ArrayList<Download> list = new ArrayList<>();
+			ArrayList<TSDownload> list = new ArrayList<>();
 			double time = 0.0;
 
-			try (InputStream is = mediaURL.openStream()) {
-				try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
-					KeyType type = KeyType.NONE;
-					byte[] key = new byte[16];
-					byte[] iv = new byte[16];
-					String line;
-					while ((line = br.readLine()) != null) {
-						line = line.trim();
-						Property property = checkProperty(line);
-						if (property == null) {
-							System.out.print("not support : ");
-							System.out.println(line);
-						} else if (property.type.equals("EXTINF")) {
-							time = time + Double.parseDouble(property.values[0]);
-						} else if (property.type.equals("EXT-X-KEY")) {
-							type = KeyType.AES128;
-							URL keyUrl = new URL(mediaURL, property.properties.get("URI"));
-							try (InputStream ks = keyUrl.openStream()) {
-								ks.read(key);
-							}
-							if (property.properties.get("IV") != null) {
-								String ivstr = property.properties.get("IV");
-								ivstr = ivstr.substring(2);
-								for (int i = 0; i < iv.length; i++) {
-									iv[i] = (byte) Integer.parseInt(ivstr.substring(i * 2, (i + 1) * 2), 16);
-								}
-							} else {
-								for (int i = 0; i < iv.length; i++) {
-									iv[i] = 0;
-								}
-							}
-						} else if (property.type.equals("FILE")) {
-							URL tsUrl = new URL(mediaURL, line);
-							list.add(new Download(time, tsUrl, type, key, iv));
-							for (int i = iv.length; i > 0; i--) {
-								iv[i - 1] = (byte) (iv[i - 1] + 1);
-								if (iv[i - 1] != 0) break;
+			try (BufferedReader br = new BufferedReader(new InputStreamReader(mediaURL.openStream()))) {
+				KeyType type = KeyType.NONE;
+				byte[] key = new byte[16];
+				byte[] iv = new byte[16];
+				String line;
+				while ((line = br.readLine()) != null) {
+					line = line.trim();
+					Property property = checkProperty(line);
+					if (property == null) {
+						System.out.print("not support : ");
+						System.out.println(line);
+					} else if (property.type.equals("EXTINF")) {
+						time = time + Double.parseDouble(property.values[0]);
+					} else if (property.type.equals("EXT-X-KEY")) {
+						type = KeyType.AES128;
+						URL keyUrl = new URL(mediaURL, property.properties.get("URI"));
+						try (InputStream ks = keyUrl.openStream()) {
+							ks.read(key);
+						}
+						if (property.properties.get("IV") != null) {
+							String ivstr = property.properties.get("IV");
+							ivstr = ivstr.substring(2);
+							for (int i = 0; i < iv.length; i++) {
+								iv[i] = (byte) Integer.parseInt(ivstr.substring(i * 2, (i + 1) * 2), 16);
 							}
 						} else {
-							System.err.print("not support : ");
-							System.err.println(line);
+							for (int i = 0; i < iv.length; i++) {
+								iv[i] = 0;
+							}
 						}
+					} else if (property.type.equals("FILE")) {
+						URL tsUrl = new URL(mediaURL, line);
+						list.add(new TSDownload(time, tsUrl, type, key, iv));
+						for (int i = iv.length; i > 0; i--) {
+							iv[i - 1] = (byte) (iv[i - 1] + 1);
+							if (iv[i - 1] != 0) break;
+						}
+					} else {
+						System.err.print("not support : ");
+						System.err.println(line);
 					}
 				}
 			}
 
 			listener.progress(0.0, time);
 
-			try (OutputStream fileStream = this.output;) {
-				for (Download down : list) {
-					if (status != Status.RUNNING) return;
-					Cipher cipher;
-					KeyType type = down.getType();
-					if (type == KeyType.AES128) {
-						cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-						Key skey = new SecretKeySpec(down.getKey(), "AES");
-						IvParameterSpec param = new IvParameterSpec(down.getIv());
-						cipher.init(Cipher.DECRYPT_MODE, skey, param);
-					} else if (type == KeyType.NONE) {
-						cipher = new NullCipher();
-					} else {
-						throw new IllegalStateException();
+			try (OutputStream fileStream = this.output) {
+				for (int i = 0; i < list.size(); i=i+MULTI_DOWNLOAD) {
+					for (int j = i; j < list.size() && j < i+MULTI_DOWNLOAD ; j++) {
+						list.get(j).start();
 					}
-					try (InputStream ts = down.getUrl().openStream(); BufferedInputStream bufferedInputStream = new BufferedInputStream(ts); CipherInputStream cipherInputStream = new CipherInputStream(bufferedInputStream, cipher)) {
-						boolean firstPacket = true;
-						boolean endByte = false;
-						int PACKETSIZE = 188;
-						byte[] buf = new byte[PACKETSIZE]; // mpegtsが188でワンパケットのため188
-						int readByte;
-						int nowByte;
-						while (!endByte) {
-							nowByte = 0;
-							readByte = 0;
-							while (nowByte < PACKETSIZE && (readByte = cipherInputStream.read(buf, nowByte, PACKETSIZE - nowByte)) >= 0) {
-								nowByte += readByte;
-							}
-							if (readByte < 0) {
-								endByte = true;
-							}
-
-							if (firstPacket && buf[0] != 0x47) { // ワンパケットの最初の1バイトは47で始まる
-								throw new IllegalStateException("MPEG2 TSでないファイル");
-							}
-							firstPacket = false;
-							if (nowByte == 188 && buf[0] == 0x47) {
-								// System.err.println("write");
-								//mpeg2ts(buf);
-								fileStream.write(buf, 0, nowByte);
-							} else if (endByte) {
-								// System.err.println("fileend MPEG2 TSパケットでない");
-							} else {
-								//fileStream.write(buf, 0, nowByte);
-								System.err.println("MPEG2 TSパケットでない");
-							}
-						}
+					for (int j = i; j < list.size() && j < i+MULTI_DOWNLOAD ; j++) {
+						while (!list.get(j).isFinish()) Thread.sleep(1000L);
+						fileStream.write(list.get(j).getData());
+						listener.progress(list.get(j).getTime(), time);
 					}
-					listener.progress(down.getTime(), time);
 				}
 			}
-
 			status = Status.COMPLETE;
 			listener.complete();
 		} catch (Exception ex) {

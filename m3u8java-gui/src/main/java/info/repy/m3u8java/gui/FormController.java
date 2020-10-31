@@ -1,5 +1,8 @@
 package info.repy.m3u8java.gui;
 
+import java.io.BufferedWriter;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.URL;
 import java.util.ResourceBundle;
 import java.util.concurrent.*;
@@ -29,6 +32,8 @@ public class FormController implements Initializable {
 	private TextField urlFilename;
 	@FXML
 	private Label progressLabel;
+	@FXML
+	private TextArea logText;
 
 	@Override
 	public void initialize(URL url, ResourceBundle rb) {
@@ -75,6 +80,11 @@ public class FormController implements Initializable {
 		m3u8.start(new GUIM3U8Listener(this));
 	}
 
+	@FXML
+	private void logReset(ActionEvent event) {
+		logText.setText("");
+	}
+
 	private static class GUIM3U8Listener implements AsyncListener {
 
 		private boolean first = true;
@@ -107,7 +117,13 @@ public class FormController implements Initializable {
 
 		@Override
 		public void exception(Exception e) {
-
+			String text = c.logText.getText();
+			StringWriter sw = new StringWriter();
+			try(PrintWriter pw = new PrintWriter(sw);) {
+				e.printStackTrace(pw);
+				pw.println();
+			}
+			c.logText.setText(text + sw.toString());
 		}
 	}
 
