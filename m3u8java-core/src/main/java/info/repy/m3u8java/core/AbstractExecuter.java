@@ -7,48 +7,53 @@ import java.io.OutputStream;
 
 public abstract class AbstractExecuter implements Executer {
 
-	protected final String url;
-	protected final OutputStream output;
-	protected Status status = Status.NONE;
+    protected final String url;
+    protected final OutputStream output;
 
-	public AbstractExecuter(String url, String savefilename) {
-		try {
-			this.url = url;
-			File file = new File(savefilename).getAbsoluteFile();
-			file.getParentFile().mkdirs();
-			this.output =  new FileOutputStream(file);
-		} catch (FileNotFoundException ex) {
-			throw new RuntimeException(ex);
-		}
-	}
+    protected Status status = Status.NONE;
 
-	public AbstractExecuter(String url, OutputStream stream) {
-		this.url = url;
-		this.output = stream;
-	}
+    public Status getStatus() {
+        return status;
+    }
 
-	@Override
-	public void start(AsyncListener listener) {
-		if (status != Status.NONE) {
-			return;
-		}
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				AbstractExecuter.this.run(listener);
-			}
-		}).start();
-	}
+    public AbstractExecuter(String url, String savefilename) {
+        try {
+            this.url = url;
+            File file = new File(savefilename).getAbsoluteFile();
+            file.getParentFile().mkdirs();
+            this.output = new FileOutputStream(file);
+        } catch (FileNotFoundException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
 
-	@Override
-	public void start() {
-		this.run(new AsyncListenerImpl());
-	}
+    public AbstractExecuter(String url, OutputStream stream) {
+        this.url = url;
+        this.output = stream;
+    }
 
-	@Override
-	public void cancel() {
-		this.status = Status.CANCEL;
-	}
+    @Override
+    public void start(AsyncListener listener) {
+        if (status != Status.NONE) {
+            return;
+        }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                AbstractExecuter.this.run(listener);
+            }
+        }).start();
+    }
 
-	protected abstract void run(AsyncListener listener);
+    @Override
+    public void start() {
+        this.run(new AsyncListenerImpl());
+    }
+
+    @Override
+    public void cancel() {
+        this.status = Status.CANCEL;
+    }
+
+    protected abstract void run(AsyncListener listener);
 }

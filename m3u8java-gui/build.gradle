@@ -1,6 +1,6 @@
 plugins {
     id 'application'
-    id 'org.openjfx.javafxplugin' version '0.0.8'
+    id 'org.openjfx.javafxplugin' version '0.0.9'
     // zipの"image/lib/modules"内にJDKとOpenJFXとアプリが合体して保存される
     id 'org.beryx.jlink' version '2.18.0'
     // JDKのみにしたい場合は"org.beryx.runtime"を使う
@@ -9,7 +9,7 @@ plugins {
 group 'info.repy'
 version '1.0-SNAPSHOT'
 
-java{
+java {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
 }
@@ -40,13 +40,16 @@ repositories {
 }
 
 dependencies {
-    implementation  project(':m3u8java-core')
-   // implementation 'org.json:json:20180813'
-   // implementation 'org.apache.commons:commons-compress:1.20'
-    compileOnly 'org.projectlombok:lombok:1.18.12'
-    annotationProcessor 'org.projectlombok:lombok:1.18.12'
-    testCompileOnly 'org.projectlombok:lombok:1.18.12'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.12'
+    implementation project(':m3u8java-core')
+    implementation 'commons-cli:commons-cli:1.4'
+}
+
+task cui(type: JavaExec) {
+    main = 'info.repy.m3u8java.cui.CUI'
+    classpath = sourceSets.main.runtimeClasspath
+    if (project.hasProperty('args')) {
+        argsString = project.args
+    }
 }
 
 task buildWindows(type: Zip, dependsOn: jlinkZip) {
