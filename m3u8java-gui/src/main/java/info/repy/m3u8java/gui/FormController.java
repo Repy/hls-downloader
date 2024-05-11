@@ -31,6 +31,8 @@ public class FormController implements Initializable {
     @FXML
     private TextField urlFilename;
     @FXML
+    private TextField urlReferer;
+    @FXML
     private Label progressLabel;
     @FXML
     private TextArea logText;
@@ -74,7 +76,11 @@ public class FormController implements Initializable {
 
     @FXML
     private void urlDownloadAction(ActionEvent event) {
-        Executer m3u8 = new M3U8(urlUrl.getText(), urlFilename.getText() + ".ts");
+        M3U8 m3u8 = new M3U8(urlUrl.getText(), urlFilename.getText() + ".ts");
+        String referer = urlReferer.getText();
+        if(!referer.isEmpty()){
+            m3u8.setReferer(referer);
+        }
         urlUrl.clear();
         urlFilename.clear();
         m3u8.start(new GUIM3U8Listener(this));
